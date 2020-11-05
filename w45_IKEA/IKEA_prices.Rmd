@@ -1,0 +1,163 @@
+---
+title: "Prices of Furniture and Tables at IKEA"
+subtitle: "A Tidytuesday project"
+author: "S.Soundarya"
+date: "`r Sys.Date()`"
+output:
+  tufte::tufte_html: default
+  tufte::tufte_handout:
+    citation_package: natbib
+    latex_engine: xelatex
+  tufte::tufte_book:
+    citation_package: natbib
+    latex_engine: xelatex
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+options(htmltools.dir.version = FALSE)
+```
+
+# TidyTuesday Week 45 IKEA Furniture
+
+## Read data
+
+
+
+```{r,warning=FALSE,message=FALSE}
+ikea <- readr::read_csv('https://raw.githubusercontent.com/rfordatascience/tidytuesday/master/data/2020/2020-11-03/ikea.csv')
+```
+
+## Check data
+
+```{r}
+dim(ikea)
+names(ikea)
+str(ikea)
+```
+
+## Categories of furniture
+```{r}
+table(ikea$category)
+```
+^[Looks like Tables & desks category has the highest number, let me pick this for building regression models]
+
+# Load libraries
+```{r,message=FALSE,warning=FALSE}
+library(tidyverse)
+```
+
+
+# Making subset of the data
+
+```{r}
+ikea_tabdesk<- ikea %>%
+  filter(category=="Tables & desks")
+dim(ikea_tabdesk)
+head(ikea_tabdesk)
+```
+
+
+# Building regression models  
+
+## Does online availability determine the price of the item?
+```{r}
+model1<- lm(price~sellable_online,data = ikea_tabdesk)
+summary(model1)
+```
+
+^[No, having an online presence doesnt influence the price]  
+
+## Does availbility of color choices determine the price of the item?
+
+```{r colorchoices fig-margin, fig.margin = TRUE, fig.cap = "Price of the product based on color availability.", fig.width=3.5, fig.height=3.5, cache=TRUE, message=FALSE,warning=FALSE}
+library(ggpubr)
+library(ggthemes)
+ggplot(ikea_tabdesk, aes(other_colors,price)) +
+  geom_boxplot()+
+  stat_compare_means()+
+  theme_tufte()
+model2<- lm(price~other_colors,data = ikea_tabdesk)
+summary(model2)
+```
+
+
+^[wow, yes, looks like color choices are related to price,i.e. if colors are available, the product is priced lower]  
+
+## What about height, width and depth of the item  
+
+### Height of the item and its price
+
+```{r height fig-margin, fig.margin = TRUE, fig.cap = "Taller items are priced more (marginal significance) ", fig.width=3.5, fig.height=3.5, cache=TRUE, message=FALSE,warning=FALSE}
+ggplot(ikea_tabdesk, aes(height,price)) +
+  geom_point()+
+  geom_smooth(method = "lm",se=FALSE)+
+  stat_cor()+
+  theme_tufte()
+model3<- lm(price~height, data = ikea_tabdesk)
+summary(model3)
+```
+### Width of the item and its price
+
+
+```{r width fig-margin, fig.margin = TRUE, fig.cap = "Wider items are more priced!", fig.width=3.5, fig.height=3.5, cache=TRUE, message=FALSE,warning=FALSE}
+ggplot(ikea_tabdesk, aes(width,price)) +
+  geom_point()+
+  geom_smooth(method = "lm",se=FALSE)+
+  stat_cor()+
+  theme_tufte()
+model4<- lm(price~width, data = ikea_tabdesk)
+summary(model4)
+```
+
+### Depth of the item and its price
+
+
+```{r depth fig-margin, fig.margin = TRUE, fig.cap = "Deeper items are more priced!", fig.width=3.5, fig.height=3.5, cache=TRUE, message=FALSE,warning=FALSE}
+ggplot(ikea_tabdesk, aes(depth,price)) +
+  geom_point()+
+  geom_smooth(method = "lm",se=FALSE)+
+  stat_cor()+
+  theme_tufte()
+model5<- lm(price~depth, data = ikea_tabdesk)
+summary(model5)
+```
+
+
+```{r}
+library(stargazer)
+fullmodel<- lm(price~other_colors+height+depth+width,data=ikea_tabdesk)
+summary(fullmodel)
+confint(fullmodel)
+```
+
+```{r}
+stargazer(model2,model3,model4,model5,fullmodel,
+          type = "text",
+          column.labels = c("Colors Available", "height","width","depth", "Additive Model"),
+          ci = TRUE,model.numbers = FALSE,
+          intercept.bottom = FALSE,
+          out = "newreg_td.txt",title = "What determines the price of tables&desks at IKEA?")
+
+```
+
+## Visualizing coefficients
+
+```{r,warning=FALSE,message=FALSE,fig.width=10, fig.height=3, fig.fullwidth=TRUE}
+library(jtools)
+plot_summs(model2,model3,model4,model5,fullmodel,inner_ci_level = 0.9,scale=TRUE,
+           model.names = c("colors", "height", "width", "depth", "Additive model"),
+           legend.title = "What determines the Price of Tables & Desks at IKEA?")
+```
+
+^[I excluded online availability from the model, but included height since it was marginally significant.]  
+
+`r newthought('In the additive model')`^[Note depth loses significance in the additive model], the item is priced higher  
+
+  -- if there is availability of colors,   
+  -- if it is a taller item &  
+  -- if it is a wider item  
+
+
